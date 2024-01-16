@@ -70,7 +70,7 @@ function connectNodes(nodes: Array<NodeOptions>, config: ConfigOptions) {
         Authorization: node.password,
         'Num-Shards': config.shards,
         'User-Id': config.botId,
-        'Client-Name': 'FastLink'
+        'Client-Name': 'FastLink/2.4.0'
       }
     })
 
@@ -122,7 +122,6 @@ function getRecommendedNode(): InternalNodeData {
 class Player {
   private guildId: string | number
   private node: string
-  private guildWs: PWSL | null
 
   /**
    * Constructs a Player object.
@@ -133,7 +132,6 @@ class Player {
   constructor(guildId: string | number) {
     this.guildId = guildId
     this.node = Players[this.guildId]?.node
-    this.guildWs = null
   }
 
   /**
@@ -153,7 +151,8 @@ class Player {
       paused: false,
       volume: null,
       node,
-      loop: null
+      loop: null,
+      guildWs: null
     }
 
     if (Config.queue) Players[this.guildId].queue = []
@@ -231,9 +230,11 @@ class Player {
     if (body.track?.encoded && Config.queue) {
       Players[this.guildId].queue.push(body.track.encoded)
 
-      if (Players[this.guildId].queue.length === 1 && Object.keys(body).length === 1 && !body.track?.userData) return;
+      if (Players[this.guildId].queue.length !== 1 && Object.keys(body).length !== 1)
+        delete body.track.encoded
 
-      delete body.track.encoded
+      if (Players[this.guildId].queue.length !== 1 && Object.keys(body).length === 1)
+        return;
     } else if (body.track?.encoded === null) Players[this.guildId].queue = []
   
     if (body.tracks?.encodeds) {
@@ -400,20 +401,18 @@ class Player {
   listen() {
     const voiceEvents = new event()
 
-    this.guildWs = new PWSL(`ws://${Nodes[this.node].hostname}${Nodes[this.node].port ? `:${Nodes[this.node].port}` : ''}/connection/data`, {
+    Players[this.guildId].guildWs = new PWSL(`ws://${Nodes[this.node].hostname}${Nodes[this.node].port ? `:${Nodes[this.node].port}` : ''}/connection/data`, {
       headers: {
         Authorization: Nodes[this.node].password,
         'user-id': Config.botId,
         'guild-id': this.guildId,
-        'Client-Name': 'FastLink/2.3.6'
+        'Client-Name': 'FastLink/2.4.0'
       }
     })
-
-    this.guildWs.on('open', () => {
+    .on('open', () => {
       voiceEvents.emit('open')
     })
-
-    this.guildWs.on('message', (data) => {
+    .on('message', (data) => {
       data = JSON.parse(data)
 
       if (data.type === 'startSpeakingEvent') {
@@ -424,12 +423,10 @@ class Player {
         voiceEvents.emit('endSpeaking', data.data)
       }
     })
-
-    this.guildWs.on('close', () => {
+    .on('close', () => {
       voiceEvents.emit('close')
     })
-
-    this.guildWs.on('error', (err) => {
+    .on('error', (err) => {
       voiceEvents.emit('error', err)
     })
 
@@ -442,10 +439,12 @@ class Player {
    * @returns The boolean if the player is connected or not.
    */
   stopListen() {
-    if (!this.guildWs) return false
+    const guildWs = Players[this.guildId].guildWs
 
-    this.guildWs.close()
-    this.guildWs = null
+    if (!guildWs) return false
+
+    guildWs.close()
+    Players[this.guildId].guildWs = null
 
     return true
   }

@@ -1,4 +1,5 @@
 import { TrackData } from './src/events/track/trackTypes.js'
+import PWSL from './src/ws.js'
 
 export type ConfigData = {
   botId?: string,
@@ -46,6 +47,7 @@ export type PlayerData = {
   queue?: Array<string>,
   track?: string,
   loop: 'track' | 'queue' | null,
+  guildWs: PWSL | null
 }
 
 export type InternalPlayerData = {
@@ -220,11 +222,18 @@ type VoiceData = {
   sessionId: string
 }
 
+type LyricsData = {
+  startTime?: number,
+  endTime?: number,
+  text: string
+}
+
 export type LyricsSData = {
   type: 'lyricsSingle',
   data: {
     name: string,
-    data: string,
+    synced: boolean,
+    data: Array<LyricsData>,
     rtl: boolean
   }
 }
@@ -233,7 +242,8 @@ export type LyricsMData = {
   type: 'lyricsMultiple',
   data: Array<{
     name: string,
-    data: string,
+    synced: boolean,
+    data: Array<LyricsData>,
     rtl: boolean
   }>
 }
